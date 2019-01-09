@@ -1,8 +1,13 @@
 language: go
 
-go:
-  - 1.10.x
-  - 1.11.x
+matrix:
+  include:
+  - go: "1.10.x"
+    script:  go test -v ./...
+  - go: "1.11.x"
+    script: go test -v -mod=vendor ./...
 
-script:
-- go test -cpu=1,2 -v ./...
+env:
+  - GO111MODULE=on
+
+install: true
