@@ -9,7 +9,20 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/secp256k1"
 )
 
-var Curve = secp256k1.S256()
+var (
+	// Curve is a BitCurve which implements secp256k1.
+	Curve = secp256k1.S256()
+	// One holds a big integer of 1
+	One = new(big.Int).SetInt64(1)
+	// Two holds a big integer of 2
+	Two = new(big.Int).SetInt64(2)
+	// Three holds a big integer of 3
+	Three = new(big.Int).SetInt64(3)
+	// Four holds a big integer of 4
+	Four = new(big.Int).SetInt64(4)
+	// Seven holds a big integer of 7
+	Seven = new(big.Int).SetInt64(7)
+)
 
 // Sign a 32 byte message with the private key, returning a 64 byte signature.
 // https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#signing
@@ -17,10 +30,9 @@ func Sign(privateKey *big.Int, message []byte) ([]byte, error) {
 	if len(message) != 32 {
 		return nil, errors.New("The message must be a 32-byte array")
 	}
-	// not(1 <= seckey <= n-1)
-	// if privateKey.Cmp() {
-	// 	return nil, errors.New("The secret key must be an integer in the range 1..n-1.")
-	// }
+	if privateKey.Cmp(One) < 0 || privateKey.Cmp(new(big.Int).Sub(Curve.N, One)) > 0 {
+		return nil, errors.New("The secret key must be an integer in the range 1..n-1")
+	}
 	d := intToByte(privateKey)
 	k0, err := deterministicGetK0(d, message)
 	if err != nil {
@@ -111,6 +123,8 @@ func intToByte(i *big.Int) []byte {
 	return b1[:]
 }
 
+// Marshal converts a point into the form specified in section 2.3.3 of the
+// SEC 1 standard.
 func Marshal(curve elliptic.Curve, x, y *big.Int) []byte {
 	byteLen := (curve.Params().BitSize + 7) >> 3
 
@@ -138,20 +152,20 @@ func Unmarshal(curve elliptic.Curve, data []byte) (x, y *big.Int) {
 	x = new(big.Int).SetBytes(data[1 : 1+byteLen])
 	P := curve.Params().P
 	ySq := new(big.Int)
-	ySq.Exp(x, new(big.Int).SetInt64(3), P)
-	ySq.Add(ySq, new(big.Int).SetInt64(7))
+	ySq.Exp(x, Three, P)
+	ySq.Add(ySq, Seven)
 	ySq.Mod(ySq, P)
 	y0 := new(big.Int)
-	P1 := new(big.Int).Add(P, new(big.Int).SetInt64(1))
-	d := new(big.Int).Mod(P1, new(big.Int).SetInt64(4))
+	P1 := new(big.Int).Add(P, One)
+	d := new(big.Int).Mod(P1, Four)
 	P1.Sub(P1, d)
-	P1.Div(P1, new(big.Int).SetInt64(4))
+	P1.Div(P1, Four)
 	y0.Exp(ySq, P1, P)
 
-	if new(big.Int).Exp(y0, new(big.Int).SetInt64(2), P).Cmp(ySq) != 0 {
+	if new(big.Int).Exp(y0, Two, P).Cmp(ySq) != 0 {
 		return nil, nil
 	}
-	if new(big.Int).And(y0, new(big.Int).SetInt64(1)).Cmp(odd) != 0 {
+	if new(big.Int).And(y0, One).Cmp(odd) != 0 {
 		y = y0.Sub(P, y0)
 	} else {
 		y = y0

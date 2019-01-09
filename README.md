@@ -58,16 +58,16 @@ Requiring the module gives an object with two methods:
 Sign a 32 byte message with the private key, returning a 64 byte signature. Read [more](https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#signing)
 
 ##### Arguments
-  
+
 1. privateKey (*big.Int): The secret key is an integer in the range 1..n-1.
 2. message ([]byte): The message is a 32-byte array.
   
 ##### Returns
-  
+
 ([]byte, error): A 64 byte array signature. An error if signing fails.
 
 ##### Examples
-  
+
 ```go
 // signing
 privateKey, _ := new(big.Int).SetString("B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF", 16)
@@ -76,7 +76,7 @@ createdSignature, err := schnorr.Sign(privateKey, message)
 if err != nil {
   fmt.Printf("The signing is failed: %v\n", err)
 }
-fmt.Printf("The signature is: %x\n" + createdSignature)
+fmt.Printf("The signature is: %x\n", createdSignature)
 ```
 
 ### Verify(pubKey, message, signature []byte) (bool, error)
@@ -97,7 +97,7 @@ Verify a 64 byte signature of a 32 byte message against the public key. Read [mo
 // verifying
 publicKey, _ := hex.DecodeString("02DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659")
 message, _ := hex.DecodeString("243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89")
-signatureToVerify, _ := hex.DecodeString("2A298DACAE57395A15D0795DDBFD1DCB564DA82B0F269BC70A74F8220429BA1D1E51A22CCEC35599B8F266912281F8365FFC2D035A230434A1A64DC59F7013FD"
+signatureToVerify, _ := hex.DecodeString("2A298DACAE57395A15D0795DDBFD1DCB564DA82B0F269BC70A74F8220429BA1D1E51A22CCEC35599B8F266912281F8365FFC2D035A230434A1A64DC59F7013FD")
 if result, err := schnorr.Verify(publicKey, message, signatureToVerify); err != nil {
   fmt.Printf("The signature verification failed: %v\n", err)
 } else if result {
@@ -105,7 +105,7 @@ if result, err := schnorr.Verify(publicKey, message, signatureToVerify); err != 
 }
 ```
 
-## Benchmark
+## Benchmarks
 
 ```
 BenchmarkSign-4     	    1000	   1960591 ns/op	   34080 B/op	     602 allocs/op
@@ -117,13 +117,13 @@ BenchmarkVerify-4   	     100	  10368368 ns/op	  236963 B/op	    3605 allocs/op
 * Intel® Core™ i3-2310M CPU @ 2.10GHz × 4
 * 4Gb RAM
 
-##### Version
+##### Versions
 
 * Go 1.11.2
 * Ubuntu 18.04.01 LTS x86_64 OS
 * 4.15.0-39-generic kernel
 
-## Credit
+## Credits
 
 * https://github.com/guggero/bip-schnorr
 * https://github.com/sipa/bips/tree/bip-schnorr/bip-schnorr
