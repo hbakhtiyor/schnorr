@@ -8,6 +8,6 @@ matrix:
     script: go test -v -mod=vendor ./...
 
 env:
-  - GO111MODULE=on
+  - "PATH=/home/travis/gopath/bin:$PATH" GO111MODULE=on
 
 install: true
