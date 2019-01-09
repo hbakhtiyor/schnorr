@@ -19,11 +19,11 @@ correctly for every edge case!**
 
 * [Usage](#usage)
 * [API](#api)
-    * [Sign(privateKey *big.Int, message []byte) ([]byte, error)](#comparea-b-string-float64)
+    * [Sign(privateKey *big.Int, message []byte) ([]byte, error)](#signprivatekey-bigint-message-byte-byte-error)
         * [Arguments](#arguments)
         * [Returns](#returns)
         * [Examples](#examples)
-    * [Verify(pubKey, message, signature []byte) (bool, error)](#findbestmatchs-string-targets-string-matchresult)
+    * [Verify(pubKey, message, signature []byte) (bool, error)](#verifypubkey-message-signature-byte-bool-error)
         * [Arguments](#arguments-1)
         * [Returns](#returns-1)
         * [Examples](#examples-1)
@@ -55,8 +55,7 @@ Requiring the module gives an object with two methods:
 
 ### Sign(privateKey *big.Int, message []byte) ([]byte, error)
 
-Sign a 32 byte message with the private key, returning a 64 byte signature.
-https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#signing
+Sign a 32 byte message with the private key, returning a 64 byte signature. Read [more](https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#signing)
 
 ##### Arguments
   
@@ -82,8 +81,7 @@ fmt.Printf("The signature is: %x\n" + createdSignature)
 
 ### Verify(pubKey, message, signature []byte) (bool, error)
 
-Verify a 64 byte signature of a 32 byte message against the public key.
-https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#verification
+Verify a 64 byte signature of a 32 byte message against the public key. Read [more](https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#verification)
 
 ##### Arguments
 
@@ -92,7 +90,7 @@ https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#verification
 3. signature ([]byte): The signature is a 64-byte array.
 
 ##### Returns
-(bool, error): An error if verification fails.
+(bool, error): True if signature is valid, An error if verification fails.
 
 ##### Examples
 ```go
@@ -126,5 +124,6 @@ BenchmarkVerify-4   	     100	  10368368 ns/op	  236963 B/op	    3605 allocs/op
 * 4.15.0-39-generic kernel
 
 ## Credit
-https://github.com/guggero/bip-schnorr
-https://github.com/sipa/bips/tree/bip-schnorr/bip-schnorr
+
+* https://github.com/guggero/bip-schnorr
+* https://github.com/sipa/bips/tree/bip-schnorr/bip-schnorr

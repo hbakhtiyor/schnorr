@@ -105,14 +105,12 @@ func deterministicGetK0(d, message []byte) (*big.Int, error) {
 	return k0, nil
 }
 
-// https://github.com/btcsuite/btcd/blob/master/btcec/pubkey.go#L187
 func intToByte(i *big.Int) []byte {
 	b1, b2 := [32]byte{}, i.Bytes()
 	copy(b1[32-len(b2):], b2)
 	return b1[:]
 }
 
-// https://go-review.googlesource.com/c/go/+/1883/2/src/crypto/elliptic/elliptic.go#364
 func Marshal(curve elliptic.Curve, x, y *big.Int) []byte {
 	byteLen := (curve.Params().BitSize + 7) >> 3
 
@@ -124,46 +122,6 @@ func Marshal(curve elliptic.Curve, x, y *big.Int) []byte {
 	ret[0] += byte(y.Bit(0))
 	return ret
 }
-
-// func Unmarshal(curve elliptic.Curve, data []byte) (x, y *big.Int) {
-// 	byteLen := (curve.Params().BitSize + 7) >> 3
-// 	if (data[0] &^ 1) != 2 {
-// 		return // unrecognized point encoding
-// 	}
-
-// 	if len(data) != 1+byteLen {
-// 		return
-// 	}
-
-// 	// Based on Routine 2.2.4 in NIST Mathematical routines paper
-// 	params := curve.Params()
-// 	tx := new(big.Int).SetBytes(data[1 : 1+byteLen])
-// 	// y² = x³ - 3x + b
-// 	y2 := new(big.Int).Mul(tx, tx)
-// 	y2.Mul(y2, tx)
-// 	threeX := new(big.Int).Lsh(tx, 1)
-// 	threeX.Add(threeX, tx)
-// 	y2.Sub(y2, threeX)
-// 	y2.Add(y2, params.B)
-// 	y2.Mod(y2, params.P)
-
-// 	ty := new(big.Int)
-// 	if ty.ModSqrt(y2, params.P) == nil {
-// 		return //  "y^2" is not a square: invalid point
-// 	}
-
-// 	var y2c big.Int
-// 	y2c.Mul(ty, ty).Mod(&y2c, params.P)
-// 	if y2c.Cmp(y2) != 0 {
-// 		return // sqrt(y2)^2 != y2: invalid point
-// 	}
-// 	if ty.Bit(0) != uint(data[0]&1) {
-// 		ty.Sub(params.P, ty)
-// 	}
-
-// 	x, y = tx, ty // valid point: return it
-// 	return
-// }
 
 // Unmarshal converts a point, serialised by Marshal, into an x, y pair. On
 // error, x = nil.
