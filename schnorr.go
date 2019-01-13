@@ -26,45 +26,36 @@ var (
 
 // Sign a 32 byte message with the private key, returning a 64 byte signature.
 // https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#signing
-func Sign(privateKey *big.Int, message []byte) ([]byte, error) {
-	if len(message) != 32 {
-		return nil, errors.New("The message must be a 32-byte array")
-	}
+func Sign(privateKey *big.Int, message [32]byte) ([64]byte, error) {
+	sig := [64]byte{}
 	if privateKey.Cmp(One) < 0 || privateKey.Cmp(new(big.Int).Sub(Curve.N, One)) > 0 {
-		return nil, errors.New("The secret key must be an integer in the range 1..n-1")
+		return sig, errors.New("The secret key must be an integer in the range 1..n-1")
 	}
 	d := intToByte(privateKey)
 	k0, err := deterministicGetK0(d, message)
 	if err != nil {
-		return nil, err
+		return sig, err
 	}
 
 	Rx, Ry := Curve.ScalarBaseMult(intToByte(k0))
 	k := getK(Ry, k0)
 	Px, Py := Curve.ScalarBaseMult(d)
 	rX := intToByte(Rx)
-	e := getE(rX, Px, Py, message)
+	e := getE(Px, Py, rX, message)
 	e.Mul(e, privateKey)
 	k.Add(k, e)
 	k.Mod(k, Curve.N)
-	return append(rX, intToByte(k)...), nil
+
+	copy(sig[:32], rX)
+	copy(sig[32:], intToByte(k))
+	return sig, nil
 }
 
 // Verify a 64 byte signature of a 32 byte message against the public key.
 // Returns an error if verification fails.
 // https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#verification
-func Verify(pubKey, message, signature []byte) (bool, error) {
-	if len(pubKey) != 33 {
-		return false, errors.New("The public key must be a 33-byte array")
-	}
-	if len(message) != 32 {
-		return false, errors.New("The message must be a 32-byte array")
-	}
-	if len(signature) != 64 {
-		return false, errors.New("The signature must be a 64-byte array")
-	}
-
-	Px, Py := Unmarshal(Curve, pubKey)
+func Verify(pubKey [33]byte, message [32]byte, signature [64]byte) (bool, error) {
+	Px, Py := Unmarshal(Curve, pubKey[:])
 
 	if Px == nil && Py == nil {
 		return false, errors.New("signature verification failed")
@@ -73,12 +64,12 @@ func Verify(pubKey, message, signature []byte) (bool, error) {
 	if r.Cmp(Curve.P) >= 0 {
 		return false, errors.New("r is larger than or equal to field size")
 	}
-	s := new(big.Int).SetBytes(signature[32:64])
+	s := new(big.Int).SetBytes(signature[32:])
 	if s.Cmp(Curve.N) >= 0 {
 		return false, errors.New("s is larger than or equal to curve order")
 	}
 
-	e := getE(intToByte(r), Px, Py, message)
+	e := getE(Px, Py, intToByte(r), message)
 	sGx, sGy := Curve.ScalarBaseMult(intToByte(s))
 	// e.Sub(Curve.N, e)
 	ePx, ePy := Curve.ScalarMult(Px, Py, intToByte(e))
@@ -91,9 +82,9 @@ func Verify(pubKey, message, signature []byte) (bool, error) {
 	return true, nil
 }
 
-func getE(rX []byte, Px, Py *big.Int, m []byte) *big.Int {
+func getE(Px, Py *big.Int, rX []byte, m [32]byte) *big.Int {
 	r := append(rX, Marshal(Curve, Px, Py)...)
-	r = append(r, m...)
+	r = append(r, m[:]...)
 	h := sha256.Sum256(r)
 	i := new(big.Int).SetBytes(h[:])
 	return i.Mod(i, Curve.N)
@@ -106,8 +97,8 @@ func getK(Ry, k0 *big.Int) *big.Int {
 	return k0.Sub(Curve.N, k0)
 }
 
-func deterministicGetK0(d, message []byte) (*big.Int, error) {
-	h := sha256.Sum256(append(d[:], message...))
+func deterministicGetK0(d []byte, message [32]byte) (*big.Int, error) {
+	h := sha256.Sum256(append(d, message[:]...))
 	i := new(big.Int).SetBytes(h[:])
 	k0 := i.Mod(i, Curve.N)
 	if k0.Sign() == 0 {
