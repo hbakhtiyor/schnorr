@@ -77,7 +77,7 @@ func Verify(pubKey [33]byte, message [32]byte, signature [64]byte) (bool, error)
 	ePy.Sub(Curve.P, ePy)
 	Rx, Ry := Curve.Add(sGx, sGy, ePx, ePy)
 
-	if (Rx == nil && Ry == nil) || big.Jacobi(Ry, Curve.P) != 1 || Rx.Cmp(r) != 0 {
+	if (Rx.Sign() == 0 && Ry.Sign() == 0) || big.Jacobi(Ry, Curve.P) != 1 || Rx.Cmp(r) != 0 {
 		return false, errors.New("signature verification failed")
 	}
 	return true, nil
