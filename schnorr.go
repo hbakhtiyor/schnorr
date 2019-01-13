@@ -56,8 +56,8 @@ func Sign(privateKey *big.Int, message [32]byte) ([64]byte, error) {
 // Verify a 64 byte signature of a 32 byte message against the public key.
 // Returns an error if verification fails.
 // https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#verification
-func Verify(pubKey [33]byte, message [32]byte, signature [64]byte) (bool, error) {
-	Px, Py := Unmarshal(Curve, pubKey[:])
+func Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, error) {
+	Px, Py := Unmarshal(Curve, publicKey[:])
 
 	if Px == nil && Py == nil {
 		return false, errors.New("signature verification failed")
