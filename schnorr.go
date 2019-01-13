@@ -29,8 +29,9 @@ var (
 func Sign(privateKey *big.Int, message [32]byte) ([64]byte, error) {
 	sig := [64]byte{}
 	if privateKey.Cmp(One) < 0 || privateKey.Cmp(new(big.Int).Sub(Curve.N, One)) > 0 {
-		return sig, errors.New("the secret key must be an integer in the range 1..n-1")
+		return sig, errors.New("the private key must be an integer in the range 1..n-1")
 	}
+
 	d := intToByte(privateKey)
 	k0, err := deterministicGetK0(d, message)
 	if err != nil {
@@ -81,6 +82,55 @@ func Verify(pubKey [33]byte, message [32]byte, signature [64]byte) (bool, error)
 		return false, errors.New("signature verification failed")
 	}
 	return true, nil
+}
+
+// AggregateSignatures aggregates multiple signatures of different private keys over
+// the same message into a single 64 byte signature.
+func AggregateSignatures(privateKeys []*big.Int, message [32]byte) ([64]byte, error) {
+	sig := [64]byte{}
+	if privateKeys == nil || len(privateKeys) == 0 {
+		return sig, errors.New("privateKeys must be an array with one or more elements")
+	}
+
+	k0s := []*big.Int{}
+	Rys := []*big.Int{}
+	Px, Py := new(big.Int), new(big.Int)
+	Rx, Ry := new(big.Int), new(big.Int)
+	for _, privateKey := range privateKeys {
+		if privateKey.Cmp(One) < 0 || privateKey.Cmp(new(big.Int).Sub(Curve.N, One)) > 0 {
+			return sig, errors.New("the private key must be an integer in the range 1..n-1")
+		}
+
+		d := intToByte(privateKey)
+		k0i, err := deterministicGetK0(d, message)
+		if err != nil {
+			return sig, err
+		}
+
+		RiX, RiY := Curve.ScalarBaseMult(intToByte(k0i))
+		PiX, PiY := Curve.ScalarBaseMult(d)
+
+		k0s = append(k0s, k0i)
+		Rys = append(Rys, RiY)
+
+		Rx, Ry = Curve.Add(Rx, Ry, RiX, RiY)
+		Px, Py = Curve.Add(Px, Py, PiX, PiY)
+	}
+
+	rX := intToByte(Rx)
+	e := getE(Px, Py, rX, message)
+	s := new(big.Int).SetInt64(0)
+
+	for i, k0 := range k0s {
+		k := getK(Rys[i], k0)
+		k.Add(k, new(big.Int).Mul(e, privateKeys[i]))
+		s.Add(s, k)
+		s.Mod(s, Curve.N)
+	}
+
+	copy(sig[:32], rX)
+	copy(sig[32:], intToByte(s))
+	return sig, nil
 }
 
 func getE(Px, Py *big.Int, rX []byte, m [32]byte) *big.Int {
