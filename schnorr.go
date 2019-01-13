@@ -140,11 +140,10 @@ func Unmarshal(curve elliptic.Curve, data []byte) (x, y *big.Int) {
 		return
 	}
 
-	odd := new(big.Int).SetInt64(int64(data[0]) - 2)
-	x = new(big.Int).SetBytes(data[1 : 1+byteLen])
+	x0 := new(big.Int).SetBytes(data[1 : 1+byteLen])
 	P := curve.Params().P
 	ySq := new(big.Int)
-	ySq.Exp(x, Three, P)
+	ySq.Exp(x0, Three, P)
 	ySq.Add(ySq, Seven)
 	ySq.Mod(ySq, P)
 	y0 := new(big.Int)
@@ -155,12 +154,11 @@ func Unmarshal(curve elliptic.Curve, data []byte) (x, y *big.Int) {
 	y0.Exp(ySq, P1, P)
 
 	if new(big.Int).Exp(y0, Two, P).Cmp(ySq) != 0 {
-		return nil, nil
+		return
 	}
-	if new(big.Int).And(y0, One).Cmp(odd) != 0 {
-		y = y0.Sub(P, y0)
-	} else {
-		y = y0
+	if y0.Bit(0) != uint(data[0]&1) {
+		y0.Sub(P, y0)
 	}
+	x, y = x0, y0
 	return
 }
