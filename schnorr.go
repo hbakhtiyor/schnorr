@@ -6,12 +6,12 @@ import (
 	"errors"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/crypto/secp256k1"
+	"github.com/btcsuite/btcd/btcec"
 )
 
 var (
-	// Curve is a BitCurve which implements secp256k1.
-	Curve = secp256k1.S256()
+	// Curve is a KoblitzCurve which implements secp256k1.
+	Curve = btcec.S256()
 	// One holds a big integer of 1
 	One = new(big.Int).SetInt64(1)
 	// Two holds a big integer of 2
@@ -39,6 +39,7 @@ func Sign(privateKey *big.Int, message [32]byte) ([64]byte, error) {
 
 	Rx, Ry := Curve.ScalarBaseMult(intToByte(k0))
 	k := getK(Ry, k0)
+
 	Px, Py := Curve.ScalarBaseMult(d)
 	rX := intToByte(Rx)
 	e := getE(Px, Py, rX, message)
