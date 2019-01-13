@@ -29,7 +29,7 @@ var (
 func Sign(privateKey *big.Int, message [32]byte) ([64]byte, error) {
 	sig := [64]byte{}
 	if privateKey.Cmp(One) < 0 || privateKey.Cmp(new(big.Int).Sub(Curve.N, One)) > 0 {
-		return sig, errors.New("The secret key must be an integer in the range 1..n-1")
+		return sig, errors.New("the secret key must be an integer in the range 1..n-1")
 	}
 	d := intToByte(privateKey)
 	k0, err := deterministicGetK0(d, message)

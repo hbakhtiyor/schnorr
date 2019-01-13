@@ -71,11 +71,11 @@ func TestVerify(t *testing.T) {
 		}
 		copy(sig[:], signature)
 
-		// defer func() {
-		// 	if r := recover(); r != nil {
-		// 		t.Fatalf("Unexpected panic from Verify(%s, %s, %s): %v ", test.pk, test.m, test.sig, r)
-		// 	}
-		// }()
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("Unexpected panic from Verify(%s, %s, %s): %v ", test.pk, test.m, test.sig, r)
+			}
+		}()
 
 		// when
 		observed, err := Verify(pk, m, sig)
