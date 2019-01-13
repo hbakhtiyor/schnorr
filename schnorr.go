@@ -29,7 +29,7 @@ var (
 func Sign(privateKey *big.Int, message [32]byte) ([64]byte, error) {
 	sig := [64]byte{}
 	if privateKey.Cmp(One) < 0 || privateKey.Cmp(new(big.Int).Sub(Curve.N, One)) > 0 {
-		return sig, errors.New("The secret key must be an integer in the range 1..n-1")
+		return sig, errors.New("the secret key must be an integer in the range 1..n-1")
 	}
 	d := intToByte(privateKey)
 	k0, err := deterministicGetK0(d, message)
@@ -39,6 +39,10 @@ func Sign(privateKey *big.Int, message [32]byte) ([64]byte, error) {
 
 	Rx, Ry := Curve.ScalarBaseMult(intToByte(k0))
 	k := getK(Ry, k0)
+	if Rx.Sign() == 0 || k.Sign() == 0 || Rx.Cmp(Curve.N) >= 0 || k.Cmp(Curve.N) >= 0 {
+		// TODO regenerate k0
+		return sig, errors.New("signature signing failed")
+	}
 
 	Px, Py := Curve.ScalarBaseMult(d)
 	rX := intToByte(Rx)
