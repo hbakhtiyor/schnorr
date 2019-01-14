@@ -160,7 +160,7 @@ func BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]by
 }
 
 // AggregateSignatures aggregates multiple signatures of different private keys over
-// the same message into a single 64 byte signature.
+// the same message into a single 64 byte signature. (Experimental)
 func AggregateSignatures(privateKeys []*big.Int, message [32]byte) ([64]byte, error) {
 	sig := [64]byte{}
 	if privateKeys == nil || len(privateKeys) == 0 {

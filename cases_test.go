@@ -39,6 +39,15 @@ var testCases = []struct {
 		"",
 	},
 	{
+		"6d6c66873739bc7bfb3526629670d0ea357e92cc4581490d62779ae15f6b787b",
+		"026d7f1d87ab3bbc8bc01f95d9aece1e659d6e33c880f8efa65facf83e698bbbf7",
+		"b2f0cd8ecb23c1710903f872c31b0fd37e15224af457722a87c5e0c7f50fffb3",
+		"68ca1cc46f291a385e7c255562068357f964532300beadffb72dd93668c0c1cac8d26132eb3200b86d66de9c661a464c6b2293bb9a9f5b966e53ca736c7e504f",
+		true,
+		nil,
+		"",
+	},
+	{
 		"",
 		"03DEFDEA4CDB677750A420FEE807EACF21EB9898AE79B9768766E4FAA04A2D4A34",
 		"4DF3C3F68FCC83B27E9D42C90431A72499F17875C81A599B566C9889B9696703",
@@ -154,5 +163,14 @@ var testCases = []struct {
 		false,
 		errors.New("s is larger than or equal to curve order"),
 		"sig[32:64] is equal to curve order",
+	},
+	{
+		"",
+		"6d6c66873739bc7bfb3526629670d0ea",
+		"b2f0cd8ecb23c1710903f872c31b0fd37e15224af457722a87c5e0c7f50fffb3",
+		"2A298DACAE57395A15D0795DDBFD1DCB564DA82B0F269BC70A74F8220429BA1D1E51A22CCEC35599B8F266912281F8365FFC2D035A230434A1A64DC59F7013FD",
+		false,
+		errors.New("signature verification failed"),
+		"public key is only 16 bytes",
 	},
 }

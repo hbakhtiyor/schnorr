@@ -57,11 +57,11 @@ func TestAggregateSignatures(t *testing.T) {
 			continue
 		}
 
-		pubKey, ok := new(big.Int).SetString(test.pk, 16)
+		privKey, ok := new(big.Int).SetString(test.d, 16)
 		if !ok {
-			t.Fatalf("Unexpected error from new(big.Int).SetString(%s, 16)", test.pk)
+			t.Fatalf("Unexpected error from new(big.Int).SetString(%s, 16)", test.d)
 		}
-		pks = append(pks, pubKey)
+		pks = append(pks, privKey)
 
 		if i == 0 {
 			message, err := hex.DecodeString(test.m)
@@ -71,7 +71,7 @@ func TestAggregateSignatures(t *testing.T) {
 			copy(m[:], message)
 		}
 
-		Px, Py := Curve.ScalarBaseMult(pubKey.Bytes())
+		Px, Py := Curve.ScalarBaseMult(privKey.Bytes())
 		Pxs = append(Pxs, Px)
 		Pys = append(Pys, Py)
 	}
