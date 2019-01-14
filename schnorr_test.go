@@ -86,6 +86,14 @@ func TestAggregateSignatures(t *testing.T) {
 		Px, Py := Curve.Add(Pxs[0], Pys[0], Pxs[1], Pys[1])
 		copy(pk[:], Marshal(Curve, Px, Py))
 
+		observedSum := hex.EncodeToString(pk[:])
+		expected := "02e23a31be992bc8194e55c5eada97e73b6a973016394a3a574cc053869df027c6"
+
+		// then
+		if observedSum != expected {
+			t.Fatalf("Sum of public keys, %s, want %s", observedSum, expected)
+		}
+
 		observed, err := Verify(pk, m, sig)
 		if err != nil {
 			t.Fatalf("Unexpected error from Verify(%x, %x, %x): %v", pk, m, sig, err)
@@ -106,6 +114,14 @@ func TestAggregateSignatures(t *testing.T) {
 
 		Px, Py := Curve.Add(Pxs[1], Pys[1], Pxs[2], Pys[2])
 		copy(pk[:], Marshal(Curve, Px, Py))
+
+		observedSum := hex.EncodeToString(pk[:])
+		expected := "03fa896c006899f1d62f5560410a7116d9f87bb6724f3496f1b38e3403930c2419"
+
+		// then
+		if observedSum != expected {
+			t.Fatalf("Sum of public keys, %s, want %s", observedSum, expected)
+		}
 
 		observed, err := Verify(pk, m, sig)
 		if err != nil {
@@ -128,6 +144,14 @@ func TestAggregateSignatures(t *testing.T) {
 		Px, Py := Curve.Add(Pxs[0], Pys[0], Pxs[1], Pys[1])
 		Px, Py = Curve.Add(Px, Py, Pxs[2], Pys[2])
 		copy(pk[:], Marshal(Curve, Px, Py))
+
+		observedSum := hex.EncodeToString(pk[:])
+		expected := "02313414b84f2f9dabca753c5d335c46960003a729c6c08814635bc75a16d93343"
+
+		// then
+		if observedSum != expected {
+			t.Fatalf("Sum of public keys, %s, want %s", observedSum, expected)
+		}
 
 		observed, err := Verify(pk, m, sig)
 		if err != nil {
