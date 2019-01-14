@@ -328,7 +328,7 @@ func TestBatchVerify(t *testing.T) {
 	// when
 	observed, err := BatchVerify(publicKeys, messages, signatures)
 	if err != nil {
-		t.Fatalf("Unexpected error from Verify(%x, %x, %x): %v", publicKeys, messages, signatures, err)
+		t.Fatalf("Unexpected error from BatchVerify(%x, %x, %x): %v", publicKeys, messages, signatures, err)
 	}
 
 	// then
