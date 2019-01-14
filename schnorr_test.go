@@ -286,6 +286,57 @@ func TestVerify(t *testing.T) {
 	}
 }
 
+func TestBatchVerify(t *testing.T) {
+	publicKeys := [][33]byte{}
+	messages := [][32]byte{}
+	signatures := [][64]byte{}
+	for _, test := range testCases {
+		if !test.result {
+			continue
+		}
+
+		// given
+		var (
+			pk  [33]byte
+			m   [32]byte
+			sig [64]byte
+		)
+
+		pubKey, err := hex.DecodeString(test.pk)
+		if err != nil {
+			t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", test.pk, err)
+		}
+		copy(pk[:], pubKey)
+
+		message, err := hex.DecodeString(test.m)
+		if err != nil {
+			t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", test.m, err)
+		}
+		copy(m[:], message)
+
+		signature, err := hex.DecodeString(test.sig)
+		if err != nil {
+			t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", test.sig, err)
+		}
+		copy(sig[:], signature)
+
+		publicKeys = append(publicKeys, pk)
+		messages = append(messages, m)
+		signatures = append(signatures, sig)
+	}
+
+	// when
+	observed, err := BatchVerify(publicKeys, messages, signatures)
+	if err != nil {
+		t.Fatalf("Unexpected error from Verify(%x, %x, %x): %v", publicKeys, messages, signatures, err)
+	}
+
+	// then
+	if !observed {
+		t.Fatalf("BatchVerify(%x, %x, %x) = %v, want %v", publicKeys, messages, signatures, observed, true)
+	}
+}
+
 func BenchmarkSign(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, test := range testCases {
