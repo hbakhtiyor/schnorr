@@ -62,7 +62,7 @@ func Sign(privateKey *big.Int, message [32]byte) ([64]byte, error) {
 func Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, error) {
 	Px, Py := Unmarshal(Curve, publicKey[:])
 
-	if Px == nil || Py == nil {
+	if Px == nil || Py == nil || !Curve.IsOnCurve(Px, Py) {
 		return false, errors.New("signature verification failed")
 	}
 	r := new(big.Int).SetBytes(signature[:32])
@@ -103,7 +103,7 @@ func BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]by
 		message := messages[i]
 		Px, Py := Unmarshal(Curve, publicKey[:])
 
-		if Px == nil || Py == nil {
+		if Px == nil || Py == nil || !Curve.IsOnCurve(Px, Py) {
 			return false, errors.New("signature verification failed")
 		}
 		r := new(big.Int).SetBytes(signature[:32])
