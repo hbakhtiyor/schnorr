@@ -1,9 +1,10 @@
 package schnorr
 
 import (
+	"fmt"
+
 	"gopkg.in/dedis/kyber.v2"
 	"gopkg.in/dedis/kyber.v2/group/edwards25519"
-	"fmt"
 )
 
 var curve = edwards25519.NewBlakeSHA256Ed25519()
@@ -67,8 +68,8 @@ func Sign(m string, x kyber.Scalar) *Signature {
 	// Get the base of the curve.
 	g := curve.Point().Base()
 
-	// Pick a random k from allowed set.
-	k := curve.Scalar().Pick(curve.RandomStream())
+	// Hash(x || m)
+	k := curve.Scalar().SetBytes(Hash(x.String() + m))
 
 	// r = k * G (likewise, r = g^k)
 	r := curve.Point().Mul(k, g)
