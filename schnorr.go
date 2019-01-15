@@ -1,214 +1,136 @@
 package schnorr
 
 import (
-	"crypto/elliptic"
-	"crypto/sha256"
-	"errors"
-	"math/big"
-
-	"github.com/btcsuite/btcd/btcec"
+	"gopkg.in/dedis/kyber.v2"
+	"gopkg.in/dedis/kyber.v2/group/edwards25519"
+	"fmt"
 )
 
-var (
-	// Curve is a KoblitzCurve which implements secp256k1.
-	Curve = btcec.S256()
-	// One holds a big integer of 1
-	One = new(big.Int).SetInt64(1)
-	// Two holds a big integer of 2
-	Two = new(big.Int).SetInt64(2)
-	// Three holds a big integer of 3
-	Three = new(big.Int).SetInt64(3)
-	// Four holds a big integer of 4
-	Four = new(big.Int).SetInt64(4)
-	// Seven holds a big integer of 7
-	Seven = new(big.Int).SetInt64(7)
-)
+var curve = edwards25519.NewBlakeSHA256Ed25519()
+var sha256 = curve.Hash()
 
-// Sign a 32 byte message with the private key, returning a 64 byte signature.
-// https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#signing
-func Sign(privateKey *big.Int, message [32]byte) ([64]byte, error) {
-	sig := [64]byte{}
-	if privateKey.Cmp(One) < 0 || privateKey.Cmp(new(big.Int).Sub(Curve.N, One)) > 0 {
-		return sig, errors.New("the private key must be an integer in the range 1..n-1")
-	}
+type Signature struct {
+	R kyber.Point
+	S kyber.Scalar
+}
 
-	d := intToByte(privateKey)
-	k0, err := deterministicGetK0(d, message)
+func (S *Signature) MarshalBinary() ([]byte, error) {
+	r, err := S.R.MarshalBinary()
 	if err != nil {
-		return sig, err
+		return nil, err
+	}
+	s, err := S.S.MarshalBinary()
+	if err != nil {
+		return nil, err
 	}
 
-	Rx, Ry := Curve.ScalarBaseMult(intToByte(k0))
-	k := getK(Ry, k0)
+	binary := append(r, s...)
 
-	Px, Py := Curve.ScalarBaseMult(d)
-	rX := intToByte(Rx)
-	e := getE(Px, Py, rX, message)
-	e.Mul(e, privateKey)
-	k.Add(k, e)
-	k.Mod(k, Curve.N)
-
-	copy(sig[:32], rX)
-	copy(sig[32:], intToByte(k))
-	return sig, nil
+	return binary, nil
 }
 
-// Verify a 64 byte signature of a 32 byte message against the public key.
-// Returns an error if verification fails.
-// https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#verification
-func Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, error) {
-	Px, Py := Unmarshal(Curve, publicKey[:])
+func (S *Signature) UnmarshalBinary(data []byte) error {
+	n := len(data)
 
-	if Px == nil && Py == nil {
-		return false, errors.New("signature verification failed")
-	}
-	r := new(big.Int).SetBytes(signature[:32])
-	if r.Cmp(Curve.P) >= 0 {
-		return false, errors.New("r is larger than or equal to field size")
-	}
-	s := new(big.Int).SetBytes(signature[32:])
-	if s.Cmp(Curve.N) >= 0 {
-		return false, errors.New("s is larger than or equal to curve order")
-	}
+	S.R.UnmarshalBinary(data[:n/2])
+	S.S.UnmarshalBinary(data[n/2:])
 
-	e := getE(Px, Py, intToByte(r), message)
-	sGx, sGy := Curve.ScalarBaseMult(intToByte(s))
-	// e.Sub(Curve.N, e)
-	ePx, ePy := Curve.ScalarMult(Px, Py, intToByte(e))
-	ePy.Sub(Curve.P, ePy)
-	Rx, Ry := Curve.Add(sGx, sGy, ePx, ePy)
-
-	if (Rx.Sign() == 0 && Ry.Sign() == 0) || big.Jacobi(Ry, Curve.P) != 1 || Rx.Cmp(r) != 0 {
-		return false, errors.New("signature verification failed")
-	}
-	return true, nil
+	return nil
 }
 
-// AggregateSignatures aggregates multiple signatures of different private keys over
-// the same message into a single 64 byte signature. (Experimental)
-func AggregateSignatures(privateKeys []*big.Int, message [32]byte) ([64]byte, error) {
-	sig := [64]byte{}
-	if privateKeys == nil || len(privateKeys) == 0 {
-		return sig, errors.New("privateKeys must be an array with one or more elements")
-	}
-
-	k0s := []*big.Int{}
-	Rys := []*big.Int{}
-	Px, Py := new(big.Int), new(big.Int)
-	Rx, Ry := new(big.Int), new(big.Int)
-	for _, privateKey := range privateKeys {
-		if privateKey.Cmp(One) < 0 || privateKey.Cmp(new(big.Int).Sub(Curve.N, One)) > 0 {
-			return sig, errors.New("the private key must be an integer in the range 1..n-1")
-		}
-
-		d := intToByte(privateKey)
-		k0i, err := deterministicGetK0(d, message)
-		if err != nil {
-			return sig, err
-		}
-
-		RiX, RiY := Curve.ScalarBaseMult(intToByte(k0i))
-		PiX, PiY := Curve.ScalarBaseMult(d)
-
-		k0s = append(k0s, k0i)
-		Rys = append(Rys, RiY)
-
-		Rx, Ry = Curve.Add(Rx, Ry, RiX, RiY)
-		Px, Py = Curve.Add(Px, Py, PiX, PiY)
-	}
-
-	rX := intToByte(Rx)
-	e := getE(Px, Py, rX, message)
-	s := new(big.Int).SetInt64(0)
-
-	for i, k0 := range k0s {
-		k := getK(Rys[i], k0)
-		k.Add(k, new(big.Int).Mul(e, privateKeys[i]))
-		s.Add(s, k)
-		s.Mod(s, Curve.N)
-	}
-
-	copy(sig[:32], rX)
-	copy(sig[32:], intToByte(s))
-	return sig, nil
+func (S Signature) String() string {
+	return fmt.Sprintf("%s%s", S.R, S.S)
 }
 
-func getE(Px, Py *big.Int, rX []byte, m [32]byte) *big.Int {
-	r := append(rX, Marshal(Curve, Px, Py)...)
-	r = append(r, m[:]...)
-	h := sha256.Sum256(r)
-	i := new(big.Int).SetBytes(h[:])
-	return i.Mod(i, Curve.N)
+func Suite() *edwards25519.SuiteEd25519 {
+	return curve
 }
 
-func getK(Ry, k0 *big.Int) *big.Int {
-	if big.Jacobi(Ry, Curve.P) == 1 {
-		return k0
-	}
-	return k0.Sub(Curve.N, k0)
+func Hash(s string) []byte {
+	sha256.Reset()
+	sha256.Write([]byte(s))
+
+	return sha256.Sum(nil)
 }
 
-func deterministicGetK0(d []byte, message [32]byte) (*big.Int, error) {
-	h := sha256.Sum256(append(d, message[:]...))
-	i := new(big.Int).SetBytes(h[:])
-	k0 := i.Mod(i, Curve.N)
-	if k0.Sign() == 0 {
-		return nil, errors.New("k0 is zero")
+// m: Message
+// x: Private key
+func Sign(m string, x kyber.Scalar) *Signature {
+	if m == "" {
+		panic("Error: Signing an empty message is insecure.")
 	}
 
-	return k0, nil
+	if x.Equal(curve.Scalar().Zero()) {
+		panic("Error: Private key cannot be zero.")
+	}
+
+	// Get the base of the curve.
+	g := curve.Point().Base()
+
+	// Pick a random k from allowed set.
+	k := curve.Scalar().Pick(curve.RandomStream())
+
+	// r = k * G (likewise, r = g^k)
+	r := curve.Point().Mul(k, g)
+
+	// Hash(m || r)
+	e := curve.Scalar().SetBytes(Hash(m + r.String()))
+
+	// s = k - e * x
+	s := curve.Scalar().Sub(k, curve.Scalar().Mul(e, x))
+
+	return &Signature{R: r, S: s}
 }
 
-func intToByte(i *big.Int) []byte {
-	b1, b2 := [32]byte{}, i.Bytes()
-	copy(b1[32-len(b2):], b2)
-	return b1[:]
+// m: Message
+// S: Signature
+func PublicKey(m string, S Signature) kyber.Point {
+	if m == "" {
+		panic("Error: Recovering an empty string is insecure.")
+	}
+	if S.R == nil || S.S == nil || S.R.Equal(curve.Point()) || S.S.Equal(curve.Scalar()) {
+		panic("Error: Signature is malformed.")
+	}
+
+	// Create a generator.
+	g := curve.Point().Base()
+
+	// e = Hash(m || r)
+	e := curve.Scalar().SetBytes(Hash(m + S.R.String()))
+
+	// y = (r - s * G) * (1 / e)
+	y := curve.Point().Sub(S.R, curve.Point().Mul(S.S, g))
+	y = curve.Point().Mul(curve.Scalar().Div(curve.Scalar().One(), e), y)
+
+	return y
 }
 
-// Marshal converts a point into the form specified in section 2.3.3 of the
-// SEC 1 standard.
-func Marshal(curve elliptic.Curve, x, y *big.Int) []byte {
-	byteLen := (curve.Params().BitSize + 7) >> 3
-
-	ret := make([]byte, 1+byteLen)
-	ret[0] = 2 // compressed point
-
-	xBytes := x.Bytes()
-	copy(ret[1+byteLen-len(xBytes):], xBytes)
-	ret[0] += byte(y.Bit(0))
-	return ret
-}
-
-// Unmarshal converts a point, serialised by Marshal, into an x, y pair. On
-// error, x = nil.
-func Unmarshal(curve elliptic.Curve, data []byte) (x, y *big.Int) {
-	byteLen := (curve.Params().BitSize + 7) >> 3
-	if (data[0] &^ 1) != 2 {
-		return
+// m: Message
+// s: Signature
+// y: Public key
+func Verify(m string, S Signature, y kyber.Point) bool {
+	if m == "" {
+		panic("Error: Signing an empty string is insecure.")
 	}
-	if len(data) != 1+byteLen {
-		return
+	if S.R == nil || S.S == nil || S.R.Equal(curve.Point()) || S.S.Equal(curve.Scalar()) {
+		panic("Error: Signature is malformed.")
+	}
+	if y.Equal(curve.Point().Null()) {
+		panic("Error: Public key should not be the curve's neutral element.")
 	}
 
-	x0 := new(big.Int).SetBytes(data[1 : 1+byteLen])
-	P := curve.Params().P
-	ySq := new(big.Int)
-	ySq.Exp(x0, Three, P)
-	ySq.Add(ySq, Seven)
-	ySq.Mod(ySq, P)
-	y0 := new(big.Int)
-	P1 := new(big.Int).Add(P, One)
-	d := new(big.Int).Mod(P1, Four)
-	P1.Sub(P1, d)
-	P1.Div(P1, Four)
-	y0.Exp(ySq, P1, P)
+	// Create a generator.
+	g := curve.Point().Base()
 
-	if new(big.Int).Exp(y0, Two, P).Cmp(ySq) != 0 {
-		return
-	}
-	if y0.Bit(0) != uint(data[0]&1) {
-		y0.Sub(P, y0)
-	}
-	x, y = x0, y0
-	return
+	// e = Hash(m || r)
+	e := curve.Scalar().SetBytes(Hash(m + S.R.String()))
+
+	// Attempt to reconstruct 's * G' with a provided signature; s * G = r - e * y
+	sGv := curve.Point().Sub(S.R, curve.Point().Mul(e, y))
+
+	// Construct the actual 's * G'
+	sG := curve.Point().Mul(S.S, g)
+
+	// Equality check; ensure signature and public key outputs to s * G.
+	return sG.Equal(sGv)
 }
