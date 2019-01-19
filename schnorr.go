@@ -96,7 +96,7 @@ func BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]by
 	}
 
 	ls := new(big.Int).SetInt64(0)
-	rsx, rsy := new(big.Int).SetInt64(0), new(big.Int).SetInt64(0)
+	rsx, rsy := new(big.Int), new(big.Int)
 
 	for i, signature := range signatures {
 		publicKey := publicKeys[i]
@@ -117,14 +117,13 @@ func BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]by
 
 		e := getE(Px, Py, intToByte(r), message)
 
-		r.Exp(r, Three, Curve.P)
-		r.Add(r, Seven)
-		c := r.Mod(r, Curve.P)
-		p1 := new(big.Int).Add(Curve.P, One)
-		d := new(big.Int).Mod(p1, Four)
-		p1.Sub(p1, d)
-		p1.Div(p1, Four)
-		y := new(big.Int).Exp(c, p1, Curve.P)
+		r2 := new(big.Int).Exp(r, Three, nil)
+		r2.Add(r2, Seven)
+		c := r2.Mod(r2, Curve.P)
+		exp := new(big.Int).Add(Curve.P, One)
+		exp.Div(exp, Four)
+		
+		y := new(big.Int).Exp(c, exp, Curve.P)
 
 		if new(big.Int).Exp(y, Two, Curve.P).Cmp(c) != 0 {
 			return false, errors.New("signature verification failed")
@@ -132,26 +131,28 @@ func BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]by
 
 		Rx, Ry := r, y
 
-		if i != 0 {
+		if i == 0 {
+			rsx.Set(Rx)
+			rsy.Set(Ry)
+			ePx, ePy := Curve.ScalarMult(Px, Py, intToByte(e))
+			rsx, rsy = Curve.Add(rsx, rsy, ePx, ePy)
+		} else {
 			a, err := deterministicGetRandA()
 			if err != nil {
 				return false, err
 			}
 
-			Rx, Ry = Curve.ScalarMult(Rx, Ry, intToByte(a))
-			Px, Py = Curve.ScalarMult(Px, Py, e.Mul(e, a).Bytes())
+			aRx, aRy := Curve.ScalarMult(Rx, Ry, intToByte(a))
+			aePx, aePy := Curve.ScalarMult(Px, Py, e.Mul(e, a).Bytes())
+			rsx, rsy = Curve.Add(rsx, rsy, aRx, aRy)
+			rsx, rsy = Curve.Add(rsx, rsy, aePx, aePy)
 			s.Mul(s, a)
 		}
-
-		rsx.Add(rsx, Rx)
-		rsx.Add(rsx, Px)
-		rsy.Add(rsy, Ry)
-		rsy.Add(rsy, Py)
 
 		ls.Add(ls, s)
 	}
 
-	Gx, Gy := Curve.ScalarBaseMult(ls.Bytes())
+	Gx, Gy := Curve.ScalarBaseMult(ls.Mod(ls, Curve.N).Bytes())
 	if Gx.Cmp(rsx) != 0 || Gy.Cmp(rsy) != 0 {
 		return false, errors.New("signature verification failed")
 	}
