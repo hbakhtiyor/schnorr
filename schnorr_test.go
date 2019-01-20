@@ -61,7 +61,6 @@ func TestAggregateSignatures(t *testing.T) {
 	}
 
 	t.Run("Can sign and verify two aggregated signatures over same message", func(t *testing.T) {
-		t.Skip()
 		sig, err := AggregateSignatures(pks[:2], m)
 		if err != nil {
 			t.Fatalf("Unexpected error from AggregateSignatures(%x, %x): %v", pks[:2], m, err)
@@ -71,7 +70,7 @@ func TestAggregateSignatures(t *testing.T) {
 		copy(pk[:], Marshal(Curve, Px, Py))
 
 		observedSum := hex.EncodeToString(pk[:])
-		expected := "02e23a31be992bc8194e55c5eada97e73b6a973016394a3a574cc053869df027c6"
+		expected := "02bca9ea6e07a63bec3d28a00329ac3d25d2595a5f86e512142affde48a34d9a97"
 
 		// then
 		if observedSum != expected {
@@ -90,7 +89,6 @@ func TestAggregateSignatures(t *testing.T) {
 	})
 
 	t.Run("Can sign and verify two more aggregated signatures over same message", func(t *testing.T) {
-		t.Skip()
 		sig, err := AggregateSignatures(pks[1:3], m)
 		if err != nil {
 			t.Fatalf("Unexpected error from AggregateSignatures(%x, %x): %v", pks[1:3], m, err)
@@ -100,7 +98,7 @@ func TestAggregateSignatures(t *testing.T) {
 		copy(pk[:], Marshal(Curve, Px, Py))
 
 		observedSum := hex.EncodeToString(pk[:])
-		expected := "03fa896c006899f1d62f5560410a7116d9f87bb6724f3496f1b38e3403930c2419"
+		expected := "03f0a6305d39a34582ba49a78bdf38ced935b3efce1e889d6820103665f35ee45b"
 
 		// then
 		if observedSum != expected {
@@ -119,7 +117,6 @@ func TestAggregateSignatures(t *testing.T) {
 	})
 
 	t.Run("Can sign and verify three aggregated signatures over same message", func(t *testing.T) {
-		t.Skip()
 		sig, err := AggregateSignatures(pks[:3], m)
 		if err != nil {
 			t.Fatalf("Unexpected error from AggregateSignatures(%x, %x): %v", pks[:3], m, err)
@@ -130,7 +127,7 @@ func TestAggregateSignatures(t *testing.T) {
 		copy(pk[:], Marshal(Curve, Px, Py))
 
 		observedSum := hex.EncodeToString(pk[:])
-		expected := "02313414b84f2f9dabca753c5d335c46960003a729c6c08814635bc75a16d93343"
+		expected := "025038e8f113785d84e86584d8a323debb1c212bf19c678185ddb1bb3e478ecde3"
 
 		// then
 		if observedSum != expected {

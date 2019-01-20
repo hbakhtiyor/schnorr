@@ -174,7 +174,6 @@ func AggregateSignatures(privateKeys []*big.Int, message [32]byte) ([64]byte, er
 	}
 
 	k0s := []*big.Int{}
-	Rys := []*big.Int{}
 	Px, Py := new(big.Int), new(big.Int)
 	Rx, Ry := new(big.Int), new(big.Int)
 	for _, privateKey := range privateKeys {
@@ -192,7 +191,6 @@ func AggregateSignatures(privateKeys []*big.Int, message [32]byte) ([64]byte, er
 		PiX, PiY := Curve.ScalarBaseMult(d)
 
 		k0s = append(k0s, k0i)
-		Rys = append(Rys, RiY)
 
 		Rx, Ry = Curve.Add(Rx, Ry, RiX, RiY)
 		Px, Py = Curve.Add(Px, Py, PiX, PiY)
@@ -203,14 +201,13 @@ func AggregateSignatures(privateKeys []*big.Int, message [32]byte) ([64]byte, er
 	s := new(big.Int).SetInt64(0)
 
 	for i, k0 := range k0s {
-		k := getK(Rys[i], k0)
+		k := getK(Ry, k0)
 		k.Add(k, new(big.Int).Mul(e, privateKeys[i]))
 		s.Add(s, k)
-		s.Mod(s, Curve.N)
 	}
 
 	copy(sig[:32], rX)
-	copy(sig[32:], intToByte(s))
+	copy(sig[32:], intToByte(s.Mod(s, Curve.N)))
 	return sig, nil
 }
 
