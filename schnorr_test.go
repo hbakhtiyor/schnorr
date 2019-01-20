@@ -310,6 +310,17 @@ func BenchmarkBatchVerify(b *testing.B) {
 	}
 }
 
+func BenchmarkAggregateSignatures(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		privKey1 := decodePrivateKey("B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF", nil)
+		privKey2 := decodePrivateKey("C90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B14E5C7", nil)
+		m := decodeMessage("243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89", nil)
+
+		pks := []*big.Int{privKey1, privKey2}
+		AggregateSignatures(pks, m)
+	}
+}
+
 func decodeSignature(s string, t *testing.T) (sig [64]byte) {
 	signature, err := hex.DecodeString(s)
 	if err != nil && t != nil {
