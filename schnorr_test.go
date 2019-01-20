@@ -1,6 +1,7 @@
 package schnorr
 
 import (
+	"errors"
 	"math/big"
 	"strings"
 	"testing"
@@ -15,18 +16,8 @@ func TestSign(t *testing.T) {
 		}
 
 		// given
-		d, ok := new(big.Int).SetString(test.d, 16)
-		if !ok {
-			t.Fatalf("Unexpected error from new(big.Int).SetString(%s, 16)", test.d)
-		}
-
-		var m [32]byte
-
-		message, err := hex.DecodeString(test.m)
-		if err != nil {
-			t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", test.m, err)
-		}
-		copy(m[:], message)
+		d := decodePrivateKey(test.d, t)
+		m := decodeMessage(test.m, t)
 
 		// when
 		result, err := Sign(d, m)
@@ -57,18 +48,11 @@ func TestAggregateSignatures(t *testing.T) {
 			continue
 		}
 
-		privKey, ok := new(big.Int).SetString(test.d, 16)
-		if !ok {
-			t.Fatalf("Unexpected error from new(big.Int).SetString(%s, 16)", test.d)
-		}
+		privKey := decodePrivateKey(test.d, t)
 		pks = append(pks, privKey)
 
 		if i == 0 {
-			message, err := hex.DecodeString(test.m)
-			if err != nil {
-				t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", test.m, err)
-			}
-			copy(m[:], message)
+			m = decodeMessage(test.m, t)
 		}
 
 		Px, Py := Curve.ScalarBaseMult(privKey.Bytes())
@@ -165,55 +149,29 @@ func TestAggregateSignatures(t *testing.T) {
 	})
 
 	t.Run("Can aggregate and verify example in README", func(t *testing.T) {
-		privKey1 := "B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF"
-		privateKey1, ok := new(big.Int).SetString(privKey1, 16)
-		if !ok {
-			t.Fatalf("Unexpected error from new(big.Int).SetString(%s, 16)", privKey1)
-		}
+		privKey1 := decodePrivateKey("B7E151628AED2A6ABF7158809CF4F3C762E7160F38B4DA56A784D9045190CFEF", t)
+		privKey2 := decodePrivateKey("C90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B14E5C7", t)
+		m := decodeMessage("243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89", t)
 
-		privKey2 := "C90FDAA22168C234C4C6628B80DC1CD129024E088A67CC74020BBEA63B14E5C7"
-		privateKey2, ok := new(big.Int).SetString(privKey2, 16)
-		if !ok {
-			t.Fatalf("Unexpected error from new(big.Int).SetString(%s, 16)", privKey2)
-		}
-
-		msg := "243F6A8885A308D313198A2E03707344A4093822299F31D0082EFA98EC4E6C89"
-
-		message, err := hex.DecodeString(msg)
-		if err != nil {
-			t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", msg, err)
-		}
-		copy(m[:], message)
-
-		pks := []*big.Int{privateKey1, privateKey2}
+		pks := []*big.Int{privKey1, privKey2}
 		aggregatedSignature, err := AggregateSignatures(pks, m)
 		expected := "d60d7f81c15d57b04f8f6074de17f1b9eef2e0a9c9b2e93550c15b45d6998dc24ef5e393b356e7c334f36cee15e0f5f1e9ce06e7911793ddb9bd922d545b7525"
 		observed := hex.EncodeToString(aggregatedSignature[:])
 
 		// then
 		if observed != expected {
-			t.Fatalf("AggregateSignatures(%x, %x) = %s, want %s", pks, message, observed, expected)
+			t.Fatalf("AggregateSignatures(%x, %x) = %s, want %s", pks, m, observed, expected)
 		}
 		if err != nil {
-			t.Fatalf("Unexpected error from AggregateSignatures(%x, %x): %v", pks, message, err)
+			t.Fatalf("Unexpected error from AggregateSignatures(%x, %x): %v", pks, m, err)
 		}
 
 		// verifying an aggregated signature
-		pubKey1 := "02DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659"
-		pubKey2 := "03FAC2114C2FBB091527EB7C64ECB11F8021CB45E8E7809D3C0938E4B8C0E5F84B"
+		pubKey1 := decodePublicKey("02DFF1D77F2A671C5F36183726DB2341BE58FEAE1DA2DECED843240F7B502BA659", t)
+		pubKey2 := decodePublicKey("03FAC2114C2FBB091527EB7C64ECB11F8021CB45E8E7809D3C0938E4B8C0E5F84B", t)
 
-		publicKey1, err := hex.DecodeString(pubKey1)
-		if err != nil {
-			t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", pubKey1, err)
-		}
-
-		publicKey2, err := hex.DecodeString(pubKey2)
-		if err != nil {
-			t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", pubKey2, err)
-		}
-
-		P1x, P1y := Unmarshal(Curve, publicKey1)
-		P2x, P2y := Unmarshal(Curve, publicKey2)
+		P1x, P1y := Unmarshal(Curve, pubKey1[:])
+		P2x, P2y := Unmarshal(Curve, pubKey2[:])
 		Px, Py := Curve.Add(P1x, P1y, P2x, P2y)
 
 		copy(pk[:], Marshal(Curve, Px, Py))
@@ -241,41 +199,13 @@ func TestAggregateSignatures(t *testing.T) {
 func TestVerify(t *testing.T) {
 	for _, test := range testCases {
 		// given
-		var (
-			pk  [33]byte
-			m   [32]byte
-			sig [64]byte
-		)
-
-		pubKey, err := hex.DecodeString(test.pk)
-		if err != nil {
-			t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", test.pk, err)
-		}
-		copy(pk[:], pubKey)
-
-		message, err := hex.DecodeString(test.m)
-		if err != nil {
-			t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", test.m, err)
-		}
-		copy(m[:], message)
-
-		signature, err := hex.DecodeString(test.sig)
-		if err != nil {
-			t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", test.sig, err)
-		}
-		copy(sig[:], signature)
-
-		defer func() {
-			if r := recover(); r != nil {
-				t.Fatalf("Unexpected panic from Verify(%s, %s, %s): %v ", test.pk, test.m, test.sig, r)
-			}
-		}()
+		pk := decodePublicKey(test.pk, t)
+		m := decodeMessage(test.m, t)
+		sig := decodeSignature(test.sig, t)
 
 		// when
 		observed, err := Verify(pk, m, sig)
-		if err != nil && test.err == nil {
-			t.Fatalf("Unexpected error from Verify(%s, %s, %s): %v", test.pk, test.m, test.sig, err)
-		} else if err != nil && err.Error() != test.err.Error() {
+		if err != nil && (test.err == nil || err.Error() != test.err.Error()) {
 			t.Fatalf("Unexpected error from Verify(%s, %s, %s): %v", test.pk, test.m, test.sig, err)
 		}
 
@@ -286,16 +216,74 @@ func TestVerify(t *testing.T) {
 	}
 }
 
+type Batch struct {
+	PublicKeys [][33]byte
+	Messages   [][32]byte
+	Signatures [][64]byte
+}
+
+func (b *Batch) Append(pk [33]byte, m [32]byte, sig [64]byte) {
+	b.PublicKeys = append(b.PublicKeys, pk)
+	b.Messages = append(b.Messages, m)
+	b.Signatures = append(b.Signatures, sig)
+}
+
+func (b *Batch) Merge(a *Batch) {
+	b.PublicKeys = append(b.PublicKeys, a.PublicKeys...)
+	b.Messages = append(b.Messages, a.Messages...)
+	b.Signatures = append(b.Signatures, a.Signatures...)
+}
+
+func TestBatchVerify(t *testing.T) {
+	valid := &Batch{}
+	invalid := &Batch{}
+
+	checkBatchVerify := func(b *Batch, expected bool, e error) {
+		// when
+		observed, err := BatchVerify(b.PublicKeys, b.Messages, b.Signatures)
+		if err != nil && (e == nil || err.Error() != e.Error()) {
+			t.Fatalf("Unexpected error from BatchVerify(%x, %x, %x): %v", b.PublicKeys, b.Messages, b.Signatures, err)
+		}
+
+		// then
+		if expected != observed {
+			t.Fatalf("BatchVerify(%x, %x, %x) = %v, want %v", b.PublicKeys, b.Messages, b.Signatures, observed, expected)
+		}
+	}
+
+	for _, test := range testCases {
+		// given
+		pk := decodePublicKey(test.pk, t)
+		m := decodeMessage(test.m, t)
+		sig := decodeSignature(test.sig, t)
+
+		if test.result {
+			valid.Append(pk, m, sig)
+
+			checkBatchVerify(valid, test.result, test.err)
+		} else {
+			invalid.Append(pk, m, sig)
+
+			checkBatchVerify(invalid, test.result, errors.New("signature verification failed"))
+		}
+
+		checkBatchVerify(&Batch{[][33]byte{pk}, [][32]byte{m}, [][64]byte{sig}}, test.result, test.err)
+	}
+
+	// TODO add tests for nil and empty array parameters
+	//      BatchVerify(nil, nil, nil)
+	checkBatchVerify(invalid, false, errors.New("signature verification failed"))
+}
+
 func BenchmarkSign(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, test := range testCases {
 			if test.d == "" {
 				continue
 			}
-			var m [32]byte
-			d, _ := new(big.Int).SetString(test.d, 16)
-			message, _ := hex.DecodeString(test.m)
-			copy(m[:], message)
+
+			d := decodePrivateKey(test.d, nil)
+			m := decodeMessage(test.m, nil)
 			Sign(d, m)
 		}
 	}
@@ -304,20 +292,58 @@ func BenchmarkSign(b *testing.B) {
 func BenchmarkVerify(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		for _, test := range testCases {
-			var (
-				pk  [33]byte
-				m   [32]byte
-				sig [64]byte
-			)
-
-			pubKey, _ := hex.DecodeString(test.pk)
-			message, _ := hex.DecodeString(test.m)
-			signature, _ := hex.DecodeString(test.sig)
-			copy(pk[:], pubKey)
-			copy(m[:], message)
-			copy(sig[:], signature)
+			pk := decodePublicKey(test.pk, nil)
+			m := decodeMessage(test.m, nil)
+			sig := decodeSignature(test.sig, nil)
 
 			Verify(pk, m, sig)
 		}
 	}
+}
+
+func BenchmarkBatchVerify(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for _, test := range testCases {
+			pk := decodePublicKey(test.pk, nil)
+			m := decodeMessage(test.m, nil)
+			sig := decodeSignature(test.sig, nil)
+
+			BatchVerify([][33]byte{pk}, [][32]byte{m}, [][64]byte{sig})
+		}
+	}
+}
+
+func decodeSignature(s string, t *testing.T) (sig [64]byte) {
+	signature, err := hex.DecodeString(s)
+	if err != nil && t != nil {
+		t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", s, err)
+	}
+	copy(sig[:], signature)
+	return
+}
+
+func decodeMessage(m string, t *testing.T) (msg [32]byte) {
+	message, err := hex.DecodeString(m)
+	if err != nil && t != nil {
+		t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", m, err)
+	}
+	copy(msg[:], message)
+	return
+}
+
+func decodePublicKey(pk string, t *testing.T) (pubKey [33]byte) {
+	publicKey, err := hex.DecodeString(pk)
+	if err != nil && t != nil {
+		t.Fatalf("Unexpected error from hex.DecodeString(%s): %v", pk, err)
+	}
+	copy(pubKey[:], publicKey)
+	return
+}
+
+func decodePrivateKey(d string, t *testing.T) *big.Int {
+	privKey, ok := new(big.Int).SetString(d, 16)
+	if !ok && t != nil {
+		t.Fatalf("Unexpected error from new(big.Int).SetString(%s, 16)", d)
+	}
+	return privKey
 }

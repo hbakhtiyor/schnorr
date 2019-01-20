@@ -2,6 +2,7 @@ package schnorr
 
 import (
 	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
 	"errors"
 	"math/big"
@@ -22,6 +23,8 @@ var (
 	Four = new(big.Int).SetInt64(4)
 	// Seven holds a big integer of 7
 	Seven = new(big.Int).SetInt64(7)
+	// N2 holds a big integer of N-2
+	N2 = new(big.Int).Sub(Curve.N, Two)
 )
 
 // Sign a 32 byte message with the private key, returning a 64 byte signature.
@@ -59,7 +62,7 @@ func Sign(privateKey *big.Int, message [32]byte) ([64]byte, error) {
 func Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, error) {
 	Px, Py := Unmarshal(Curve, publicKey[:])
 
-	if Px == nil && Py == nil {
+	if Px == nil || Py == nil || !Curve.IsOnCurve(Px, Py) {
 		return false, errors.New("signature verification failed")
 	}
 	r := new(big.Int).SetBytes(signature[:32])
@@ -81,6 +84,84 @@ func Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, err
 	if (Rx.Sign() == 0 && Ry.Sign() == 0) || big.Jacobi(Ry, Curve.P) != 1 || Rx.Cmp(r) != 0 {
 		return false, errors.New("signature verification failed")
 	}
+	return true, nil
+}
+
+// BatchVerify verifies a list of 64 byte signatures of 32 byte messages against the public keys.
+// Returns an error if verification fails.
+// https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#batch-verification
+func BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]byte) (bool, error) {
+	if publicKeys == nil || len(publicKeys) == 0 {
+		return false, errors.New("publicKeys must be an array with one or more elements")
+	}
+	if messages == nil || len(messages) == 0 {
+		return false, errors.New("messages must be an array with one or more elements")
+	}
+	if signatures == nil || len(signatures) == 0 {
+		return false, errors.New("signatures must be an array with one or more elements")
+	}
+	if len(publicKeys) != len(messages) || len(messages) != len(signatures) {
+		return false, errors.New("all parameters must be an array with the same length")
+	}
+
+	ls := new(big.Int).SetInt64(0)
+	a := new(big.Int).SetInt64(1)
+	rsx, rsy := new(big.Int), new(big.Int)
+
+	for i, signature := range signatures {
+		publicKey := publicKeys[i]
+		message := messages[i]
+		Px, Py := Unmarshal(Curve, publicKey[:])
+
+		if Px == nil || Py == nil || !Curve.IsOnCurve(Px, Py) {
+			return false, errors.New("signature verification failed")
+		}
+		r := new(big.Int).SetBytes(signature[:32])
+		if r.Cmp(Curve.P) >= 0 {
+			return false, errors.New("r is larger than or equal to field size")
+		}
+		s := new(big.Int).SetBytes(signature[32:])
+		if s.Cmp(Curve.N) >= 0 {
+			return false, errors.New("s is larger than or equal to curve order")
+		}
+
+		e := getE(Px, Py, intToByte(r), message)
+
+		r2 := new(big.Int).Exp(r, Three, nil)
+		r2.Add(r2, Seven)
+		c := r2.Mod(r2, Curve.P)
+		exp := new(big.Int).Add(Curve.P, One)
+		exp.Div(exp, Four)
+
+		y := new(big.Int).Exp(c, exp, Curve.P)
+
+		if new(big.Int).Exp(y, Two, Curve.P).Cmp(c) != 0 {
+			return false, errors.New("signature verification failed")
+		}
+
+		Rx, Ry := r, y
+
+		if i != 0 {
+			var err error
+			a, err = deterministicGetRandA()
+			if err != nil {
+				return false, err
+			}
+		}
+
+		aRx, aRy := Curve.ScalarMult(Rx, Ry, intToByte(a))
+		aePx, aePy := Curve.ScalarMult(Px, Py, e.Mul(e, a).Bytes())
+		rsx, rsy = Curve.Add(rsx, rsy, aRx, aRy)
+		rsx, rsy = Curve.Add(rsx, rsy, aePx, aePy)
+		s.Mul(s, a)
+		ls.Add(ls, s)
+	}
+
+	Gx, Gy := Curve.ScalarBaseMult(intToByte(ls.Mod(ls, Curve.N)))
+	if Gx.Cmp(rsx) != 0 || Gy.Cmp(rsy) != 0 {
+		return false, errors.New("signature verification failed")
+	}
+
 	return true, nil
 }
 
@@ -157,6 +238,15 @@ func deterministicGetK0(d []byte, message [32]byte) (*big.Int, error) {
 	}
 
 	return k0, nil
+}
+
+func deterministicGetRandA() (*big.Int, error) {
+	a, err := rand.Int(rand.Reader, N2)
+	if err != nil {
+		return nil, err
+	}
+
+	return a.Add(a, One), nil
 }
 
 func intToByte(i *big.Int) []byte {
