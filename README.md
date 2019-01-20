@@ -1,4 +1,4 @@
-[![GoDoc](https://godoc.org/github.com/hbakhtiyor/schnorr?status.svg)](https://godoc.org/github.com/hbakhtiyor/schnorr) [![Build Status](https://travis-ci.com/hbakhtiyor/schnorr.svg?branch=master)](https://travis-ci.com/hbakhtiyor/schnorr) [![Go Report Card](https://goreportcard.com/badge/github.com/hbakhtiyor/schnorr)](https://goreportcard.com/report/github.com/hbakhtiyor/schnorr)
+[![GoDoc](https://godoc.org/github.com/hbakhtiyor/schnorr?status.svg)](https://godoc.org/github.com/hbakhtiyor/schnorr) [![Build Status](https://travis-ci.com/hbakhtiyor/schnorr.svg?branch=master)](https://travis-ci.com/hbakhtiyor/schnorr) [![Go Report Card](https://goreportcard.com/badge/github.com/hbakhtiyor/schnorr)](https://goreportcard.com/report/github.com/hbakhtiyor/schnorr)![License](https://badges.fyi/github/license/hbakhtiyor/schnorr)![Latest tag](https://badges.fyi/github/latest-tag/hbakhtiyor/schnorr)
 
 Go implementation of the Schnorr BIP
 =================
