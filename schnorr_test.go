@@ -1,6 +1,7 @@
 package schnorr
 
 import (
+	"errors"
 	"math/big"
 	"strings"
 	"testing"
@@ -204,9 +205,7 @@ func TestVerify(t *testing.T) {
 
 		// when
 		observed, err := Verify(pk, m, sig)
-		if err != nil && test.err == nil {
-			t.Fatalf("Unexpected error from Verify(%s, %s, %s): %v", test.pk, test.m, test.sig, err)
-		} else if err != nil && err.Error() != test.err.Error() {
+		if err != nil && (test.err == nil || err.Error() != test.err.Error()) {
 			t.Fatalf("Unexpected error from Verify(%s, %s, %s): %v", test.pk, test.m, test.sig, err)
 		}
 
@@ -217,35 +216,63 @@ func TestVerify(t *testing.T) {
 	}
 }
 
+type Batch struct {
+	PublicKeys [][33]byte
+	Messages   [][32]byte
+	Signatures [][64]byte
+}
+
+func (b *Batch) Append(pk [33]byte, m [32]byte, sig [64]byte) {
+	b.PublicKeys = append(b.PublicKeys, pk)
+	b.Messages = append(b.Messages, m)
+	b.Signatures = append(b.Signatures, sig)
+}
+
+func (b *Batch) Merge(a *Batch) {
+	b.PublicKeys = append(b.PublicKeys, a.PublicKeys...)
+	b.Messages = append(b.Messages, a.Messages...)
+	b.Signatures = append(b.Signatures, a.Signatures...)
+}
+
 func TestBatchVerify(t *testing.T) {
-	publicKeys := [][33]byte{}
-	messages := [][32]byte{}
-	signatures := [][64]byte{}
-	for _, test := range testCases {
-		if !test.result {
-			continue
+	valid := &Batch{}
+	invalid := &Batch{}
+
+	checkBatchVerify := func(b *Batch, expected bool, e error) {
+		// when
+		observed, err := BatchVerify(b.PublicKeys, b.Messages, b.Signatures)
+		if err != nil && (e == nil || err.Error() != e.Error()) {
+			t.Fatalf("Unexpected error from BatchVerify(%x, %x, %x): %v", b.PublicKeys, b.Messages, b.Signatures, err)
 		}
 
+		// then
+		if expected != observed {
+			t.Fatalf("BatchVerify(%x, %x, %x) = %v, want %v", b.PublicKeys, b.Messages, b.Signatures, observed, expected)
+		}
+	}
+
+	for _, test := range testCases {
 		// given
 		pk := decodePublicKey(test.pk, t)
 		m := decodeMessage(test.m, t)
 		sig := decodeSignature(test.sig, t)
 
-		publicKeys = append(publicKeys, pk)
-		messages = append(messages, m)
-		signatures = append(signatures, sig)
+		if test.result {
+			valid.Append(pk, m, sig)
 
-		// when
-		observed, err := BatchVerify(publicKeys, messages, signatures)
-		if err != nil {
-			t.Fatalf("Unexpected error from BatchVerify(%x, %x, %x): %v", publicKeys, messages, signatures, err)
+			checkBatchVerify(valid, test.result, test.err)
+		} else {
+			invalid.Append(pk, m, sig)
+
+			checkBatchVerify(invalid, test.result, errors.New("signature verification failed"))
 		}
 
-		// then
-		if !observed {
-			t.Fatalf("BatchVerify(%x, %x, %x) = %v, want %v", publicKeys, messages, signatures, observed, true)
-		}
+		checkBatchVerify(&Batch{[][33]byte{pk}, [][32]byte{m}, [][64]byte{sig}}, test.result, test.err)
 	}
+
+	// TODO add tests for nil and empty array parameters
+	//      BatchVerify(nil, nil, nil)
+	checkBatchVerify(invalid, false, errors.New("signature verification failed"))
 }
 
 func BenchmarkSign(b *testing.B) {
@@ -270,6 +297,18 @@ func BenchmarkVerify(b *testing.B) {
 			sig := decodeSignature(test.sig, nil)
 
 			Verify(pk, m, sig)
+		}
+	}
+}
+
+func BenchmarkBatchVerify(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		for _, test := range testCases {
+			pk := decodePublicKey(test.pk, nil)
+			m := decodeMessage(test.m, nil)
+			sig := decodeSignature(test.sig, nil)
+
+			BatchVerify([][33]byte{pk}, [][32]byte{m}, [][64]byte{sig})
 		}
 	}
 }

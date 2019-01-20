@@ -91,11 +91,21 @@ func Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, err
 // Returns an error if verification fails.
 // https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#batch-verification
 func BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]byte) (bool, error) {
+	if publicKeys == nil || len(publicKeys) == 0 {
+		return false, errors.New("publicKeys must be an array with one or more elements")
+	}
+	if messages == nil || len(messages) == 0 {
+		return false, errors.New("messages must be an array with one or more elements")
+	}
+	if signatures == nil || len(signatures) == 0 {
+		return false, errors.New("signatures must be an array with one or more elements")
+	}
 	if len(publicKeys) != len(messages) || len(messages) != len(signatures) {
-		return false, errors.New("all parameters must be the same length")
+		return false, errors.New("all parameters must be an array with the same length")
 	}
 
 	ls := new(big.Int).SetInt64(0)
+	a := new(big.Int).SetInt64(1)
 	rsx, rsy := new(big.Int), new(big.Int)
 
 	for i, signature := range signatures {
@@ -122,7 +132,7 @@ func BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]by
 		c := r2.Mod(r2, Curve.P)
 		exp := new(big.Int).Add(Curve.P, One)
 		exp.Div(exp, Four)
-		
+
 		y := new(big.Int).Exp(c, exp, Curve.P)
 
 		if new(big.Int).Exp(y, Two, Curve.P).Cmp(c) != 0 {
@@ -131,28 +141,23 @@ func BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]by
 
 		Rx, Ry := r, y
 
-		if i == 0 {
-			rsx.Set(Rx)
-			rsy.Set(Ry)
-			ePx, ePy := Curve.ScalarMult(Px, Py, intToByte(e))
-			rsx, rsy = Curve.Add(rsx, rsy, ePx, ePy)
-		} else {
-			a, err := deterministicGetRandA()
+		if i != 0 {
+			var err error
+			a, err = deterministicGetRandA()
 			if err != nil {
 				return false, err
 			}
-
-			aRx, aRy := Curve.ScalarMult(Rx, Ry, intToByte(a))
-			aePx, aePy := Curve.ScalarMult(Px, Py, e.Mul(e, a).Bytes())
-			rsx, rsy = Curve.Add(rsx, rsy, aRx, aRy)
-			rsx, rsy = Curve.Add(rsx, rsy, aePx, aePy)
-			s.Mul(s, a)
 		}
 
+		aRx, aRy := Curve.ScalarMult(Rx, Ry, intToByte(a))
+		aePx, aePy := Curve.ScalarMult(Px, Py, e.Mul(e, a).Bytes())
+		rsx, rsy = Curve.Add(rsx, rsy, aRx, aRy)
+		rsx, rsy = Curve.Add(rsx, rsy, aePx, aePy)
+		s.Mul(s, a)
 		ls.Add(ls, s)
 	}
 
-	Gx, Gy := Curve.ScalarBaseMult(ls.Mod(ls, Curve.N).Bytes())
+	Gx, Gy := Curve.ScalarBaseMult(intToByte(ls.Mod(ls, Curve.N)))
 	if Gx.Cmp(rsx) != 0 || Gy.Cmp(rsy) != 0 {
 		return false, errors.New("signature verification failed")
 	}
