@@ -1,4 +1,4 @@
-[![GoDoc](https://godoc.org/github.com/hbakhtiyor/schnorr?status.svg)](https://godoc.org/github.com/hbakhtiyor/schnorr) [![Build Status](https://travis-ci.com/hbakhtiyor/schnorr.svg?branch=master)](https://travis-ci.com/hbakhtiyor/schnorr) [![Go Report Card](https://goreportcard.com/badge/github.com/hbakhtiyor/schnorr)](https://goreportcard.com/report/github.com/hbakhtiyor/schnorr) [![License](https://badges.fyi/github/license/hbakhtiyor/schnorr)](https://github.com/hbakhtiyor/schnorr/blob/master/LICENSE) ![Latest tag](https://badges.fyi/github/latest-tag/hbakhtiyor/schnorr)
+[![GoDoc](https://godoc.org/github.com/hbakhtiyor/schnorr?status.svg)](https://godoc.org/github.com/hbakhtiyor/schnorr) [![Build Status](https://travis-ci.com/hbakhtiyor/schnorr.svg?branch=master)](https://travis-ci.com/hbakhtiyor/schnorr) [![Go Report Card](https://goreportcard.com/badge/github.com/hbakhtiyor/schnorr)](https://goreportcard.com/report/github.com/hbakhtiyor/schnorr) [![License](https://badges.fyi/github/license/hbakhtiyor/schnorr)](https://github.com/hbakhtiyor/schnorr/blob/master/LICENSE) [![Latest tag](https://badges.fyi/github/latest-tag/hbakhtiyor/schnorr)](https://github.com/hbakhtiyor/schnorr/releases)
 
 Go implementation of the Schnorr BIP
 =================
@@ -19,19 +19,19 @@ correctly for every edge case!**
 
 * [Usage](#usage)
 * [API](#api)
-    * [Sign(privateKey *big.Int, message [32]byte) ([64]byte, error)](#signprivatekey-bigint-message-byte-byte-error)
+    * [Sign(privateKey *big.Int, message [32]byte) ([64]byte, error)](#signprivatekey-bigint-message-32byte-64byte-error)
         * [Arguments](#arguments)
         * [Returns](#returns)
         * [Examples](#examples)
-    * [Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, error)](#verifypubkey-message-signature-byte-bool-error)
+    * [Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, error)](#verifypublickey-33byte-message-32byte-signature-64byte-bool-error)
         * [Arguments](#arguments-1)
         * [Returns](#returns-1)
         * [Examples](#examples-1)
-    * [BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]byte) (bool, error)](#verifypubkey-message-signature-byte-bool-error)
+    * [BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]byte) (bool, error)](#batchverifypublickeys-33byte-messages-32byte-signatures-64byte-bool-error)
         * [Arguments](#arguments-2)
         * [Returns](#returns-2)
         * [Examples](#examples-2)
-    * [AggregateSignatures(privateKeys []*big.Int, message [32]byte) ([64]byte, error)](#verifypubkey-message-signature-byte-bool-error)
+    * [AggregateSignatures(privateKeys []*big.Int, message [32]byte) ([64]byte, error)](#aggregatesignaturesprivatekeys-bigint-message-32byte-64byte-error)
         * [Arguments](#arguments-3)
         * [Returns](#returns-3)
         * [Examples](#examples-3)
