@@ -1,5 +1,7 @@
 module github.com/hbakhtiyor/schnorr
 
+go 1.15
+
 require (
 	github.com/btcsuite/btcd v0.0.0-20190109040709-5bda5314ca95
 	github.com/btcsuite/btcutil v0.0.0-20190112041146-bf1e1be93589 // indirect

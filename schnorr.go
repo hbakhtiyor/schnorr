@@ -1,10 +1,12 @@
 package schnorr
 
 import (
+	"bytes"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/btcsuite/btcd/btcec"
@@ -13,6 +15,9 @@ import (
 var (
 	// Curve is a KoblitzCurve which implements secp256k1.
 	Curve = btcec.S256()
+
+	// Zero holds a big integer of 0
+	Zero = new(big.Int)
 	// One holds a big integer of 1
 	One = new(big.Int).SetInt64(1)
 	// Two holds a big integer of 2
@@ -28,26 +33,58 @@ var (
 )
 
 // Sign a 32 byte message with the private key, returning a 64 byte signature.
-// https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#signing
-func Sign(privateKey *big.Int, message [32]byte) ([64]byte, error) {
+// Calling with a nil aux will cause the function to use a deterministic nonce.
+// https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki#signing
+func Sign(privateKey *big.Int, message [32]byte, aux []byte) ([64]byte, error) {
 	sig := [64]byte{}
 	if privateKey.Cmp(One) < 0 || privateKey.Cmp(new(big.Int).Sub(Curve.N, One)) > 0 {
 		return sig, errors.New("the private key must be an integer in the range 1..n-1")
 	}
 
-	d := intToByte(privateKey)
-	k0, err := deterministicGetK0(d, message)
-	if err != nil {
-		return sig, err
+	// d0 = privateKey
+	Px, Py := Curve.ScalarBaseMult(intToByte(privateKey))
+	d := new(big.Int)
+
+	if new(big.Int).And(Py, One).Cmp(Zero) == 0 {
+		// Py is even
+		d = d.Set(privateKey)
+	} else {
+		d = d.Sub(Curve.N, privateKey)
+	}
+
+	var k0 *big.Int
+	if aux != nil {
+		if len(aux) != 32 {
+			return sig, fmt.Errorf("aux must be 32 bytes, not %d", len(aux))
+		}
+
+		t := new(big.Int).Xor(
+			d,
+			new(big.Int).SetBytes(taggedHash("BIP0340/aux", aux)),
+		)
+
+		bundle := bytes.Buffer{}
+		bundle.Write(t.Bytes())
+		bundle.Write(Px.Bytes())
+		bundle.Write(message[:])
+
+		k0 = new(big.Int).Mod(
+			new(big.Int).SetBytes(taggedHash("BIP0340/nonce", bundle.Bytes())),
+			Curve.N,
+		)
+	} else {
+		k0 = deterministicGetK0(d.Bytes(), message)
+	}
+	if k0.Sign() == 0 {
+		return sig, errors.New("k0 is zero")
 	}
 
 	Rx, Ry := Curve.ScalarBaseMult(intToByte(k0))
 	k := getK(Ry, k0)
 
-	Px, Py := Curve.ScalarBaseMult(d)
 	rX := intToByte(Rx)
 	e := getE(Px, Py, rX, message)
-	e.Mul(e, privateKey)
+	e.Mul(e, d)
 	k.Add(k, e)
 	k.Mod(k, Curve.N)
 
@@ -58,8 +95,8 @@ func Sign(privateKey *big.Int, message [32]byte) ([64]byte, error) {
 
 // Verify a 64 byte signature of a 32 byte message against the public key.
 // Returns an error if verification fails.
-// https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#verification
-func Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, error) {
+// https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki#verification
+func Verify(publicKey [32]byte, message [32]byte, signature [64]byte) (bool, error) {
 	Px, Py := Unmarshal(Curve, publicKey[:])
 
 	if Px == nil || Py == nil || !Curve.IsOnCurve(Px, Py) {
@@ -81,7 +118,9 @@ func Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, err
 	ePy.Sub(Curve.P, ePy)
 	Rx, Ry := Curve.Add(sGx, sGy, ePx, ePy)
 
-	if (Rx.Sign() == 0 && Ry.Sign() == 0) || big.Jacobi(Ry, Curve.P) != 1 || Rx.Cmp(r) != 0 {
+	if (Rx.Sign() == 0 && Ry.Sign() == 0) ||
+		new(big.Int).And(Ry, One).Cmp(One) == 0 /* Ry is not even */ ||
+		Rx.Cmp(r) != 0 {
 		return false, errors.New("signature verification failed")
 	}
 	return true, nil
@@ -89,8 +128,8 @@ func Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, err
 
 // BatchVerify verifies a list of 64 byte signatures of 32 byte messages against the public keys.
 // Returns an error if verification fails.
-// https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#batch-verification
-func BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]byte) (bool, error) {
+// https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki#batch-verification
+func BatchVerify(publicKeys [][32]byte, messages [][32]byte, signatures [][64]byte) (bool, error) {
 	if publicKeys == nil || len(publicKeys) == 0 {
 		return false, errors.New("publicKeys must be an array with one or more elements")
 	}
@@ -182,9 +221,9 @@ func AggregateSignatures(privateKeys []*big.Int, message [32]byte) ([64]byte, er
 		}
 
 		d := intToByte(privateKey)
-		k0i, err := deterministicGetK0(d, message)
-		if err != nil {
-			return sig, err
+		k0i := deterministicGetK0(d, message)
+		if k0i.Sign() == 0 {
+			return sig, errors.New("k0 is zero")
 		}
 
 		RiX, RiY := Curve.ScalarBaseMult(intToByte(k0i))
@@ -212,29 +251,29 @@ func AggregateSignatures(privateKeys []*big.Int, message [32]byte) ([64]byte, er
 }
 
 func getE(Px, Py *big.Int, rX []byte, m [32]byte) *big.Int {
-	r := append(rX, Marshal(Curve, Px, Py)...)
-	r = append(r, m[:]...)
-	h := sha256.Sum256(r)
-	i := new(big.Int).SetBytes(h[:])
-	return i.Mod(i, Curve.N)
+	bundle := bytes.Buffer{}
+	bundle.Write(rX)
+	bundle.Write(Px.Bytes())
+	bundle.Write(m[:])
+	return new(big.Int).Mod(
+		new(big.Int).SetBytes(taggedHash("BIP0340/challenge", bundle.Bytes())),
+		Curve.N,
+	)
 }
 
 func getK(Ry, k0 *big.Int) *big.Int {
-	if big.Jacobi(Ry, Curve.P) == 1 {
+	if new(big.Int).And(Ry, One).Cmp(Zero) == 0 {
+		// is even
 		return k0
+	} else {
+		return new(big.Int).Sub(Curve.N, k0)
 	}
-	return k0.Sub(Curve.N, k0)
 }
 
-func deterministicGetK0(d []byte, message [32]byte) (*big.Int, error) {
+func deterministicGetK0(d []byte, message [32]byte) *big.Int {
 	h := sha256.Sum256(append(d, message[:]...))
 	i := new(big.Int).SetBytes(h[:])
-	k0 := i.Mod(i, Curve.N)
-	if k0.Sign() == 0 {
-		return nil, errors.New("k0 is zero")
-	}
-
-	return k0, nil
+	return i.Mod(i, Curve.N)
 }
 
 func deterministicGetRandA() (*big.Int, error) {
@@ -252,50 +291,58 @@ func intToByte(i *big.Int) []byte {
 	return b1[:]
 }
 
-// Marshal converts a point into the form specified in section 2.3.3 of the
-// SEC 1 standard.
+// Marshal just encodes x as bytes. Unnecessary.
 func Marshal(curve elliptic.Curve, x, y *big.Int) []byte {
-	byteLen := (curve.Params().BitSize + 7) >> 3
-
-	ret := make([]byte, 1+byteLen)
-	ret[0] = 2 // compressed point
-
-	xBytes := x.Bytes()
-	copy(ret[1+byteLen-len(xBytes):], xBytes)
-	ret[0] += byte(y.Bit(0))
-	return ret
+	return x.Bytes()
 }
 
 // Unmarshal converts a point, serialised by Marshal, into an x, y pair. On
 // error, x = nil.
 func Unmarshal(curve elliptic.Curve, data []byte) (x, y *big.Int) {
 	byteLen := (curve.Params().BitSize + 7) >> 3
-	if (data[0] &^ 1) != 2 {
-		return
-	}
-	if len(data) != 1+byteLen {
+	if len(data) != byteLen {
 		return
 	}
 
-	x0 := new(big.Int).SetBytes(data[1 : 1+byteLen])
 	P := curve.Params().P
-	ySq := new(big.Int)
-	ySq.Exp(x0, Three, P)
-	ySq.Add(ySq, Seven)
-	ySq.Mod(ySq, P)
-	y0 := new(big.Int)
-	P1 := new(big.Int).Add(P, One)
-	d := new(big.Int).Mod(P1, Four)
-	P1.Sub(P1, d)
-	P1.Div(P1, Four)
-	y0.Exp(ySq, P1, P)
-
-	if new(big.Int).Exp(y0, Two, P).Cmp(ySq) != 0 {
+	x = new(big.Int).SetBytes(data)
+	if x.Cmp(P) == 1 {
 		return
 	}
-	if y0.Bit(0) != uint(data[0]&1) {
-		y0.Sub(P, y0)
+
+	ySq := new(big.Int).Mod(
+		new(big.Int).Add(
+			new(big.Int).Exp(x, Three, P),
+			Seven,
+		),
+		P,
+	)
+	y = new(big.Int).Exp(
+		ySq,
+		new(big.Int).Div(
+			new(big.Int).Add(P, One),
+			Four,
+		),
+		P,
+	)
+
+	if new(big.Int).Exp(y, Two, P).Cmp(ySq) != 0 {
+		return
 	}
-	x, y = x0, y0
+
+	if new(big.Int).And(y, One).Cmp(Zero) != 0 {
+		// is even
+		y = y.Sub(P, y)
+	}
+
 	return
+}
+
+func taggedHash(tag string, msg []byte) []byte {
+	tagHash := sha256.Sum256([]byte(tag))
+	h := sha256.New()
+	h.Write(tagHash[:])
+	h.Write(tagHash[:])
+	h.Write(msg)
+	return h.Sum(nil)
 }

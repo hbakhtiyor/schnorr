@@ -6,12 +6,10 @@ Go implementation of the Schnorr BIP
 This is a Go implementation of the standard 64-byte Schnorr signature
 scheme over the elliptic curve *secp256k1*.
 
-The code is based upon the
-[initial proposal of Pieter Wuille](https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki)
-when it didn't have a BIP number assigned yet.
+The code is based upon [BIP340 by Pieter Wuille](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki).
 
 The current version passes all test vectors provided
-[here](https://raw.githubusercontent.com/sipa/bips/bip-schnorr/bip-schnorr/test-vectors.csv).
+[here](https://github.com/bitcoin/bips/blob/master/bip-0340/test-vectors.csv).
 **But the author does not give any guarantees that the algorithm is implemented
 correctly for every edge case!**
 
@@ -23,11 +21,11 @@ correctly for every edge case!**
         * [Arguments](#arguments)
         * [Returns](#returns)
         * [Examples](#examples)
-    * [Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, error)](#verifypublickey-33byte-message-32byte-signature-64byte-bool-error)
+    * [Verify(publicKey [32]byte, message [32]byte, signature [64]byte) (bool, error)](#verifypublickey-32byte-message-32byte-signature-64byte-bool-error)
         * [Arguments](#arguments-1)
         * [Returns](#returns-1)
         * [Examples](#examples-1)
-    * [BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]byte) (bool, error)](#batchverifypublickeys-33byte-messages-32byte-signatures-64byte-bool-error)
+    * [BatchVerify(publicKeys [][32]byte, messages [][32]byte, signatures [][64]byte) (bool, error)](#batchverifypublickeys-32byte-messages-32byte-signatures-64byte-bool-error)
         * [Arguments](#arguments-2)
         * [Returns](#returns-2)
         * [Examples](#examples-2)
@@ -67,13 +65,13 @@ Requiring the module gives an object with four methods:
 
 ### Sign(privateKey *big.Int, message [32]byte) ([64]byte, error)
 
-Sign a 32-byte message with the private key, returning a 64-byte signature. Read [more](https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#signing)
+Sign a 32-byte message with the private key, returning a 64-byte signature. Read [more](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki#Default_Signing)
 
 ##### Arguments
 
 1. privateKey (*big.Int): The integer secret key in the range 1..n-1.
 2. message ([32]byte): The 32-byte array message.
-  
+
 ##### Returns
 
 ([64]byte, error): A 64-byte array signature. An error if signing fails.
@@ -94,13 +92,13 @@ if err != nil {
 fmt.Printf("The signature is: %x\n", signature)
 ```
 
-### Verify(publicKey [33]byte, message [32]byte, signature [64]byte) (bool, error)
+### Verify(publicKey [32]byte, message [32]byte, signature [64]byte) (bool, error)
 
-Verify a 64-byte signature of a 32-byte message against the public key. Read [more](https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#verification)
+Verify a 64-byte signature of a 32-byte message against the public key. Read [more](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki#Verification).
 
 ##### Arguments
 
-1. publicKey ([33]byte): The 33-byte array public key.
+1. publicKey ([32]byte): The 32-byte array public key.
 2. message ([32]byte): The 32-byte array message.
 3. signature ([64]byte): The 64-byte array signature.
 
@@ -112,7 +110,7 @@ Verify a 64-byte signature of a 32-byte message against the public key. Read [mo
 
 ```go
 var (
-  publicKey [33]byte
+  publicKey [32]byte
   message   [32]byte
   signature [64]byte
 )
@@ -131,13 +129,13 @@ if result, err := schnorr.Verify(publicKey, message, signature); err != nil {
 }
 ```
 
-### BatchVerify(publicKeys [][33]byte, messages [][32]byte, signatures [][64]byte) (bool, error)
+### BatchVerify(publicKeys [][32]byte, messages [][32]byte, signatures [][64]byte) (bool, error)
 
-Verify a list of 64-byte signatures of a 32-byte messages against the public keys. Read [more](https://github.com/sipa/bips/blob/bip-schnorr/bip-schnorr.mediawiki#batch-verification)
+Verify a list of 64-byte signatures of a 32-byte messages against the public keys. Read [more](https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki#Verification)
 
 ##### Arguments
 
-1. publicKeys ([][33]byte): The list of 33-byte array public keys.
+1. publicKeys ([][32]byte): The list of 32-byte array public keys.
 2. messages ([][32]byte): The list of 32-byte array messages.
 3. signatures ([][64]byte): The list of 64-byte array signatures.
 
@@ -149,10 +147,10 @@ Verify a list of 64-byte signatures of a 32-byte messages against the public key
 
 ```go
 var (
-  publicKey  [33]byte
+  publicKey  [32]byte
   message    [32]byte
   signature  [64]byte
-  publicKeys [][33]byte
+  publicKeys [][32]byte
   messages   [][32]byte
   signatures [][64]byte
 )
@@ -210,7 +208,7 @@ Aggregate multiple signatures of different private keys over the same message in
 
 ```go
 var (
-  publicKey [33]byte
+  publicKey [32]byte
   message   [32]byte
 )
 
@@ -264,4 +262,4 @@ BenchmarkAggregateSignatures-4   	    2000	    593665 ns/op	   21981 B/op	     4
 ## Credits
 
 * https://github.com/guggero/bip-schnorr
-* https://github.com/sipa/bips/tree/bip-schnorr/bip-schnorr
+* https://github.com/bitcoin/bips/blob/master/bip-0340.mediawiki
