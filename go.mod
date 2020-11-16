@@ -1,4 +1,4 @@
-module github.com/hbakhtiyor/schnorr
+module github.com/fiatjaf/schnorr
 
 go 1.15
 
