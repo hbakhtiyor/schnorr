@@ -1,4 +1,6 @@
-module github.com/hbakhtiyor/schnorr
+module github.com/fiatjaf/schnorr
+
+go 1.15
 
 require (
 	github.com/btcsuite/btcd v0.0.0-20190109040709-5bda5314ca95
